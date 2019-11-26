@@ -29,6 +29,7 @@ const getCSSModuleLocalIdent = require('react-dev-utils/getCSSModuleLocalIdent')
 const paths = require('./paths');
 const modules = require('./modules');
 const getClientEnvironment = require('./env');
+const getRequiredPlugins = require('babel-preset-react-app/helpers/getRequiredPlugins');
 const ModuleNotFoundPlugin = require('react-dev-utils/ModuleNotFoundPlugin');
 const ForkTsCheckerWebpackPlugin = require('react-dev-utils/ForkTsCheckerWebpackPlugin');
 const typescriptFormatter = require('react-dev-utils/typescriptFormatter');
@@ -88,6 +89,17 @@ module.exports = function(webpackEnv) {
     : isEnvDevelopment && '';
   // Get environment variables to inject into our app.
   const env = getClientEnvironment(publicUrl);
+
+  // Terser can be configured to support es6 capable browsers. Currently it
+  // only requires support for arrow function and shorthand properties.
+  // We enable terser to target es6 browsers when our browserslist supports it.
+  // https://github.com/terser/terser/issues/235
+  const {
+    'transform-arrow-functions': isArrowFunctionsTransformRequired,
+    'transform-shorthand-properties': isShorthandPropertiesTransformRequired,
+  } = getRequiredPlugins();
+  const terserEcmaCompress = isArrowFunctionsTransformRequired ? 5 : 6;
+  const terserEcmaOutput = isShorthandPropertiesTransformRequired ? 5 : 6;
 
   // common function to get style loaders
   const getStyleLoaders = (cssOptions, preProcessor) => {
@@ -225,7 +237,11 @@ module.exports = function(webpackEnv) {
               ecma: 8,
             },
             compress: {
-              ecma: 5,
+              ecma: terserEcmaCompress,
+              // Technically unsafe_arrows must be enabled to get any benefits
+              // from setting the `ecma` flag to 6 or above. However, it will
+              // cause errors in some dependencies (like react-mapbox-gl).
+              unsafe_arrows: false,
               warnings: false,
               // Disabled because of an issue with Uglify breaking seemingly valid code:
               // https://github.com/facebook/create-react-app/issues/2376
@@ -245,7 +261,7 @@ module.exports = function(webpackEnv) {
             keep_classnames: isEnvProductionProfile,
             keep_fnames: isEnvProductionProfile,
             output: {
-              ecma: 5,
+              ecma: terserEcmaOutput,
               comments: false,
               // Turned on because emoji and regex is not minified properly using default
               // https://github.com/facebook/create-react-app/issues/2488
